@@ -91,6 +91,7 @@ a.btn{display:inline-block;text-decoration:none;width:fit-content}
 .step-t{font-weight:700}
 .steps .btn{width:fit-content}
 #out{min-height:160px;white-space:pre-wrap}
+.add-form{display:flex;flex-direction:column;gap:10px;margin-top:12px}
 </style>
 </head>
 <body>
@@ -188,6 +189,30 @@ a.btn{display:inline-block;text-decoration:none;width:fit-content}
       </details>
     </section>
   </div>
+
+  <section class="panel" aria-label="回答データ">
+    <div class="card-head">
+      <strong>回答データ</strong>
+      <span class="hint" id="dataStatus">読み込み中…</span>
+    </div>
+    <p class="hint">下書きを作るたびに、この中から質問に近い過去の回答を自動で選んで、指示文に入れています。質問箱の回答は毎日朝6時に自動で取り込まれます。</p>
+    <details id="addBox">
+      <summary>アプリを使わずに答えた回答を追加（マシュマロなど）</summary>
+      <div class="add-form">
+        <label class="lbl" for="addQ">質問</label>
+        <textarea id="addQ" rows="3"></textarea>
+        <label class="lbl" for="addA">自分の回答</label>
+        <textarea id="addA" rows="5"></textarea>
+        <div class="row">
+          <button class="btn primary" id="addBtn">追加</button>
+          <button class="btn" id="exportBtn">追加した回答をまとめてコピー</button>
+        </div>
+        <p class="hint" id="addMsg" hidden></p>
+        <p class="hint">ここで追加した回答は、この端末の中だけに保存されます。ほかの端末でも使いたいときは「まとめてコピー」してClaudeに渡してください。</p>
+        <ul class="hist" id="extraList"></ul>
+      </div>
+    </details>
+  </section>
 </div>
 
 <script>
@@ -320,8 +345,9 @@ function buildPrompt(){
     emoji ? "絵文字はルールどおり使う。" : "絵文字・顔文字は一切使わない。",
     firm ? "ぼかし表現（〜かな？と思います、個人的には）は最小限にし、結論ははっきり言い切る。" : "",
     fix ? "表記を統一する：私／頑張って／できる／1カ月／英数字は半角。誤字脱字のない文章にする。" : "",
-    "経歴・体験にないこと（受けていない試験、使っていない教材、数字）は作らない。書く必要がある場合は【要確認：〜】と書く。"
+    "経歴・体験メモと過去の回答に書かれていることは事実として使ってよい。両者が食い違うときは日付の新しい回答を優先する。どちらにもないこと（受けていない試験、使っていない教材、数字）は作らない。書く必要がある場合は【要確認：〜】と書く。"
   ].filter(Boolean).join("\n");
+  const q = mode==="qa" ? $("q").value : $("topic").value + " " + $("memo").value;
   if (mode === "qa"){
     const len = document.querySelector('input[name=len]:checked').value;
     const lenTxt = {short:"1〜3文のひとこと回答", normal:"150〜350字程度", long:"400〜600字程度"}[len];
@@ -332,6 +358,8 @@ ${FACTS}
 ${STYLE}
 
 ${EXAMPLES}
+
+${relatedBlock(q)}
 
 【追加の指示】
 長さ：${lenTxt}
@@ -353,6 +381,8 @@ ${STYLE}
 ${NOTE_RULES}
 
 ${EXAMPLES}
+
+${relatedBlock(q)}
 
 【追加の指示】
 長さ：${lenTxt}
@@ -416,6 +446,76 @@ $("save").onclick = () => {
   renderHist();
 };
 renderHist();
+
+// ---- answer data: querie (auto), marshmallow (seed), this device (manual) ----
+let ANSWERS = [];
+const XK = "mi-writer-extra";
+function loadExtra(){ try{ return JSON.parse(localStorage.getItem(XK)) || []; }catch{ return []; } }
+function saveExtra(list){ try{ localStorage.setItem(XK, JSON.stringify(list)); return true; }catch{ return false; } }
+
+// On GitHub Pages, read the newest data straight from the repo (updates even before Pages rebuilds).
+function rawBase(){
+  const m = location.hostname.match(/^([^.]+)\.github\.io$/);
+  const repo = location.pathname.split("/").filter(Boolean)[0];
+  return m && repo ? `https://raw.githubusercontent.com/${m[1]}/${repo}/main/` : null;
+}
+async function getJson(path){
+  const base = rawBase();
+  if (base){ try{ const r = await fetch(base + path, {cache:"no-store"}); if (r.ok) return await r.json(); }catch{} }
+  try{ const r = await fetch(path, {cache:"no-cache"}); if (r.ok) return await r.json(); }catch{}
+  return [];
+}
+async function loadAnswers(){
+  const [qr, mm] = await Promise.all([getJson("data/querie.json"), getJson("data/marshmallow.json")]);
+  const ex = loadExtra();
+  ANSWERS = [...qr, ...mm, ...ex];
+  const newest = qr.map(x => x.date).sort().pop() || "—";
+  $("dataStatus").textContent = `質問箱 ${qr.length}件・マシュマロ ${mm.length}件・この端末で追加 ${ex.length}件（質問箱の最新：${newest}）`;
+  renderExtra();
+}
+
+// Character-bigram overlap weighted by rarity (IDF), so shared topic words count more than 「勉強」「論文」.
+// The question text is counted twice because it says more about the topic than the answer does.
+function grams(s){ const t = s.replace(/[\s、。！？!?「」『』（）()・…‥]/g,""); const g = new Set(); for (let i=0;i<t.length-1;i++) g.add(t.slice(i,i+2)); return g; }
+function relatedBlock(query){
+  if (!ANSWERS.length) return "";
+  const qg = grams(query);
+  const G = ANSWERS.map(x => grams(x.q + " " + x.q + x.a));
+  const df = new Map(); G.forEach(g => g.forEach(k => df.set(k, (df.get(k) || 0) + 1)));
+  const N = G.length;
+  const scored = ANSWERS.map((x, i) => { let s = 0; qg.forEach(k => { if (G[i].has(k)) s += Math.log((N + 1) / (df.get(k) + 0.5)); }); return {x, s: s / Math.pow(G[i].size + 20, 0.25)}; });
+  const picked = scored.filter(o => o.s > 0).sort((a,b) => b.s - a.s).slice(0,6).map(o => o.x);
+  const recent = ANSWERS.filter(x => x.date).sort((a,b) => a.date < b.date ? 1 : -1).filter(x => !picked.includes(x)).slice(0,3);
+  const fmt = x => `Q: ${x.q.trim().slice(0,400)}\nA: ${x.a.trim()}` + (x.date ? `\n（${x.date}）` : "");
+  return `【関連する過去の回答（事実と文体の参考）】\n${picked.map(fmt).join("\n\n")}\n\n【最近の回答（新しい事実が含まれている可能性あり）】\n${recent.map(fmt).join("\n\n")}`;
+}
+
+function renderExtra(){
+  const list = loadExtra(), ul = $("extraList"); ul.textContent = "";
+  list.forEach((it, i) => {
+    const li = document.createElement("li"), b = document.createElement("button");
+    b.textContent = "削除：" + it.q.slice(0,30);
+    b.onclick = () => { const l = loadExtra(); l.splice(i,1); saveExtra(l); loadAnswers(); };
+    li.append(b); ul.append(li);
+  });
+}
+$("addBtn").onclick = () => {
+  const q = $("addQ").value.trim(), a = $("addA").value.trim();
+  if (!q || !a){ flash($("addMsg"), "質問と回答の両方を入れてください。"); return; }
+  const list = loadExtra();
+  list.unshift({source:"manual", id:"m-" + Date.now(), date: new Date().toISOString().slice(0,10), q, a});
+  flash($("addMsg"), saveExtra(list) ? "追加しました。次の下書きから使われます。" : "この端末では保存できませんでした。");
+  $("addQ").value = ""; $("addA").value = "";
+  loadAnswers();
+};
+$("exportBtn").onclick = async () => {
+  const list = loadExtra();
+  if (!list.length){ flash($("addMsg"), "まだ追加した回答がありません。"); return; }
+  const text = "み文体ライターの回答データに次の回答を追加してください。\n\n" + list.map(x => `Q: ${x.q}\nA: ${x.a}`).join("\n\n");
+  try{ await navigator.clipboard.writeText(text); flash($("addMsg"), `${list.length}件をコピーしました。`); }
+  catch{ flash($("addMsg"), "コピーできませんでした。"); }
+};
+loadAnswers();
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
