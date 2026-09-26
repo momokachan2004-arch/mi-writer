@@ -139,6 +139,14 @@ a.btn{display:inline-block;text-decoration:none;width:fit-content}
         </div>
       </div>
 
+      <label class="lbl">雰囲気</label>
+      <div class="opts" role="radiogroup">
+        <label class="chip"><input type="radio" name="tone" value="usual" checked><span>いつも通り</span></label>
+        <label class="chip"><input type="radio" name="tone" value="serious"><span>真面目</span></label>
+        <label class="chip"><input type="radio" name="tone" value="warm"><span>やさしく寄り添う</span></label>
+        <label class="chip"><input type="radio" name="tone" value="humor"><span>ユーモアあり</span></label>
+      </div>
+
       <label class="lbl">文体の調整</label>
       <div class="opts">
         <label class="chip"><input type="checkbox" id="emoji" checked><span>絵文字あり</span></label>
@@ -318,8 +326,16 @@ $("tab-note").onclick = () => setMode("note");
 
 function buildPrompt(){
   const emoji = $("emoji").checked, firm = $("firm").checked, fix = $("fix").checked;
+  const tone = document.querySelector('input[name=tone]:checked').value;
+  const TONES = {
+    usual: "",
+    serious: "雰囲気：真面目。共感のひとことは短くして、根拠と手順を中心に落ち着いた調子で書く。冗談は入れない。絵文字を使う場合も📚💡✏️など控えめなものを少しだけにする。",
+    warm: "雰囲気：やさしく寄り添う。冒頭で相手の不安や頑張りをしっかり受け止め、自分も同じように悩んだ体験があれば添える。励ましのひとことを最後に必ず入れる。責める・急かす言い方はしない。",
+    humor: "雰囲気：ユーモアあり。丁寧語のまま、くすっと笑える言い回しや真顔のボケを1〜2か所だけ入れる（例：ロー入試でおならをした質問に「これは‥かなり深刻ですので緊急で回答させていただきます」と返したような調子）。質問者をからかったり、内容の正確さを崩したりはしない。回答の中身はいつも通り具体的に。"
+  };
   const tweaks = [
-    emoji ? "絵文字はルールどおり使う。" : "絵文字・顔文字は一切使わない。",
+    TONES[tone],
+    emoji ?"絵文字はルールどおり使う。" : "絵文字・顔文字は一切使わない。",
     firm ? "ぼかし表現（〜かな？と思います、個人的には）は最小限にし、結論ははっきり言い切る。" : "",
     fix ? "表記を統一する：私／頑張って／できる／1カ月／英数字は半角。誤字脱字のない文章にする。" : "",
     "経歴・体験メモと過去の回答に書かれていることは事実として使ってよい。両者が食い違うときは日付の新しい回答を優先する。どちらにもないこと（受けていない試験、使っていない教材、数字）は作らない。書く必要がある場合は【要確認：〜】と書く。"
