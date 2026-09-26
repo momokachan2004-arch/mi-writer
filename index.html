@@ -113,7 +113,7 @@ a.btn{display:inline-block;text-decoration:none;width:fit-content}
     <section class="panel" aria-label="入力">
       <div id="in-qa" style="display:flex;flex-direction:column;gap:14px">
         <label class="lbl" for="q">届いた質問</label>
-        <textarea id="q">予備試験の論文で、時間が足りなくて最後の設問がいつも途中答案になってしまいます。みさんは時間配分で何か工夫していましたか？</textarea>
+        <textarea id="q" placeholder="届いた質問をここに貼り付け"></textarea>
         <div class="similar" id="similar" hidden>
           <div class="lbl">前にも似た質問に答えています（近い順）</div>
           <ul class="sim-list" id="simList"></ul>
@@ -128,7 +128,7 @@ a.btn{display:inline-block;text-decoration:none;width:fit-content}
 
       <div id="in-note" hidden style="display:flex;flex-direction:column;gap:14px">
         <label class="lbl" for="topic">お題</label>
-        <input type="text" id="topic" value="司法試験のタイピング対策と、CBTで答案を書き切るコツ">
+        <input type="text" id="topic" placeholder="例：司法試験のタイピング対策と、CBTで答案を書き切るコツ">
         <label class="lbl" for="memo">入れたいこと・メモ（任意）</label>
         <textarea id="memo" placeholder="例：寿司打の具体的な練習方法、本番の答案枚数など"></textarea>
         <label class="lbl">長さ</label>

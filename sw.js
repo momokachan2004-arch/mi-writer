@@ -1,5 +1,5 @@
 // Offline cache for み文体ライター. Bump VERSION whenever index.html changes.
-const VERSION = "mi-writer-v4";
+const VERSION = "mi-writer-v5";
 const FILES = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png", "data/querie.json", "data/marshmallow.json", "data/facts.md"];
 
 self.addEventListener("install", (e) => {
