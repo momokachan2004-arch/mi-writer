@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>み文体ライター</title>
+<meta name="description" content="質問箱の回答とnote記事を、みさんの文体で下書きするための指示文を作るツール">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#B83F63">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="み文体">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#F6F4F7; --surface:#FFFFFF; --ink:#1E2031; --muted:#6A6878; --line:#E3DEE6;
+  --accent:#B83F63; --accent-soft:#F7E3EA; --accent-ink:#FFFFFF;
+  --ok:#2F7D5B; --warn:#A5621B;
+  --display:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Noto Sans JP",sans-serif;
+  --body:"Noto Sans JP","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#16161F; --surface:#1F1F2B; --ink:#ECE9F1; --muted:#A5A1B3; --line:#33323F;
+    --accent:#E4789A; --accent-soft:#3A2230; --accent-ink:#1A1118; --ok:#6CC49B; --warn:#E0A866;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#16161F; --surface:#1F1F2B; --ink:#ECE9F1; --muted:#A5A1B3; --line:#33323F;
+  --accent:#E4789A; --accent-soft:#3A2230; --accent-ink:#1A1118; --ok:#6CC49B; --warn:#E0A866;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.75;padding-inline:16px;padding-block:28px 48px}
+.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:24px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+h1{font-family:var(--display);font-weight:700;font-size:28px;margin:0;letter-spacing:.02em;text-wrap:balance}
+h1 small{display:block;font-size:13px;font-family:var(--body);font-weight:500;color:var(--muted);letter-spacing:.04em}
+.tabs{display:inline-flex;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px;gap:4px}
+.tabs button{border:0;background:transparent;color:var(--muted);font:inherit;font-weight:700;padding:8px 18px;border-radius:999px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:20px;align-items:start}
+@media (max-width:820px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:14px;min-width:0}
+label.lbl{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.08em}
+textarea,input[type=text]{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 14px;resize:vertical}
+textarea:focus,input:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#q{min-height:150px}
+#memo{min-height:90px}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.chip{position:relative}
+.chip input{position:absolute;opacity:0;inset:0;cursor:pointer}
+.chip span{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:5px 14px;font-size:13px;color:var(--muted);background:var(--surface)}
+.chip input:checked + span{border-color:var(--accent);color:var(--accent);background:var(--accent-soft);font-weight:700}
+.chip input:focus-visible + span{outline:2px solid var(--accent);outline-offset:2px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.btn{font:inherit;font-weight:700;border-radius:10px;padding:10px 20px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn:disabled{opacity:.5;cursor:default}
+.hint{font-size:12px;color:var(--muted);margin:0}
+.card-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.who{display:flex;align-items:center;gap:10px}
+.avatar{width:34px;height:34px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-family:var(--display);font-weight:700}
+.status{font-size:12px;font-weight:700;border-radius:999px;padding:3px 10px;background:var(--accent-soft);color:var(--accent)}
+.status.done{background:transparent;color:var(--ok);border:1px solid currentColor}
+.qecho{font-size:13px;color:var(--muted);border-left:3px solid var(--line);padding-left:12px;white-space:pre-wrap;max-height:8em;overflow:auto}
+#out{white-space:pre-wrap;word-break:break-word;min-height:220px;font-size:15px}
+#out.placeholder{color:var(--muted)}
+.meta{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.err{color:var(--warn);font-size:13px;margin:0}
+details{border-top:1px solid var(--line);padding-top:12px}
+summary{cursor:pointer;font-weight:700;font-size:13px;color:var(--muted)}
+.hist{list-style:none;padding:0;margin:10px 0 0;display:flex;flex-direction:column;gap:8px}
+.hist li button{all:unset;cursor:pointer;display:block;font-size:13px;color:var(--ink);padding:8px 10px;border-radius:8px;background:var(--bg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.hist li button:focus-visible{outline:2px solid var(--accent)}
+.rules{font-size:13px;color:var(--muted);margin:0;padding-left:1.2em}
+@media (prefers-reduced-motion:no-preference){.status:not(.done){animation:pulse 1.4s ease-in-out infinite}}
+@keyframes pulse{50%{opacity:.55}}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;padding-top:max(28px, env(safe-area-inset-top));padding-bottom:max(48px, env(safe-area-inset-bottom))}
+a.btn{display:inline-block;text-decoration:none;width:fit-content}
+.steps{list-style:none;counter-reset:s;margin:0;padding:0;display:flex;flex-direction:column;gap:18px}
+.steps>li{counter-increment:s;position:relative;padding-left:40px;display:flex;flex-direction:column;gap:8px}
+.steps>li::before{content:counter(s);position:absolute;left:0;top:0;width:28px;height:28px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-family:var(--display);font-weight:700;display:grid;place-items:center}
+.step-t{font-weight:700}
+.steps .btn{width:fit-content}
+#out{min-height:160px;white-space:pre-wrap}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1><small>質問箱の回答とnote記事を、みさんの文体で下書き</small>み文体ライター</h1>
+    <div class="tabs" role="tablist">
+      <button id="tab-qa" role="tab" aria-selected="true">質問箱の回答</button>
+      <button id="tab-note" role="tab" aria-selected="false">note記事</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <section class="panel" aria-label="入力">
+      <div id="in-qa" style="display:flex;flex-direction:column;gap:14px">
+        <label class="lbl" for="q">届いた質問</label>
+        <textarea id="q">予備試験の論文で、時間が足りなくて最後の設問がいつも途中答案になってしまいます。みさんは時間配分で何か工夫していましたか？</textarea>
+        <label class="lbl">長さ</label>
+        <div class="opts" role="radiogroup">
+          <label class="chip"><input type="radio" name="len" value="short"><span>ひとこと</span></label>
+          <label class="chip"><input type="radio" name="len" value="normal" checked><span>ふつう</span></label>
+          <label class="chip"><input type="radio" name="len" value="long"><span>しっかり</span></label>
+        </div>
+      </div>
+
+      <div id="in-note" hidden style="display:flex;flex-direction:column;gap:14px">
+        <label class="lbl" for="topic">お題</label>
+        <input type="text" id="topic" value="司法試験のタイピング対策と、CBTで答案を書き切るコツ">
+        <label class="lbl" for="memo">入れたいこと・メモ（任意）</label>
+        <textarea id="memo" placeholder="例：寿司打の具体的な練習方法、本番の答案枚数など"></textarea>
+        <label class="lbl">長さ</label>
+        <div class="opts" role="radiogroup">
+          <label class="chip"><input type="radio" name="nlen" value="short"><span>約1500字</span></label>
+          <label class="chip"><input type="radio" name="nlen" value="normal" checked><span>約3000字</span></label>
+          <label class="chip"><input type="radio" name="nlen" value="long"><span>約5000字</span></label>
+        </div>
+      </div>
+
+      <label class="lbl">文体の調整</label>
+      <div class="opts">
+        <label class="chip"><input type="checkbox" id="emoji" checked><span>絵文字あり</span></label>
+        <label class="chip"><input type="checkbox" id="firm"><span>言い切り強め</span></label>
+        <label class="chip"><input type="checkbox" id="fix" checked><span>表記ゆれ・誤字を直す</span></label>
+      </div>
+
+
+      <details>
+        <summary>このアプリが守っている「み」さんの文体ルール</summary>
+        <ul class="rules">
+          <li>最初に気持ちを受け止める／ねぎらう</li>
+          <li>自分の具体的な体験（教材名・周回数・評価）で答える</li>
+          <li>「ですが、」で別の選択肢も1回認める</li>
+          <li>締めは「参考の一つとして☺️」「これからも勉強頑張ってください✊」系</li>
+          <li>体験にないことは作らず【要確認】と書く</li>
+        </ul>
+      </details>
+    </section>
+
+    <section class="panel" aria-label="Claudeで下書きを作る">
+      <div class="card-head">
+        <div class="who"><div class="avatar" aria-hidden="true">み</div><strong>Claudeで下書きを作る</strong></div>
+        <span class="status done">無料プランOK</span>
+      </div>
+
+      <ol class="steps">
+        <li>
+          <div class="step-t">指示文をコピー</div>
+          <p class="hint">左で入れた質問やお題と、みさんの経歴・文体ルールをまとめてコピーします。</p>
+          <button class="btn primary" id="copyPrompt">指示文をコピー</button>
+          <p class="hint" id="cpMsg" hidden></p>
+          <textarea id="cpFallback" hidden readonly rows="6" aria-label="コピー用の指示文"></textarea>
+        </li>
+        <li>
+          <div class="step-t">Claudeを開いて、新しいチャットに貼り付けて送信</div>
+          <p class="hint">スマホにClaudeアプリが入っていれば、アプリで開きます。毎回<strong>新しいチャット</strong>にしてください。</p>
+          <a class="btn" id="openClaude" href="https://claude.ai/new" target="_blank" rel="noopener">Claudeを開く ↗</a>
+        </li>
+        <li>
+          <div class="step-t">返ってきた文章を貼って保存（任意）</div>
+          <p class="hint">保存しておくと、下の「保存した下書き」からいつでも見返せます（この端末だけに保存）。</p>
+          <textarea id="out" rows="7" placeholder="Claudeの回答をここに貼り付け"></textarea>
+          <div class="meta"><span id="count"></span><span></span></div>
+          <div class="row">
+            <button class="btn" id="save">保存</button>
+            <button class="btn" id="copy">コピー</button>
+          </div>
+          <p class="hint" id="saveMsg" hidden></p>
+        </li>
+      </ol>
+
+      <details id="histBox">
+        <summary>保存した下書き</summary>
+        <ul class="hist" id="hist"></ul>
+      </details>
+    </section>
+  </div>
+</div>
+
+<script>
+const FACTS = `【みさんの経歴・体験（事実として使ってよいのはこれだけ）】
+- 令和7年(2025年)予備試験合格。大学3年で受験。現在大学4年。2026年7月に司法試験を受験済み（結果はまだ）。
+- 大学1年はサークルやNPOに所属し、就活するつもりだった。大学1年の春休み（2024年初め）から予備試験の勉強開始。アガルートの「最短合格カリキュラム」を受講（独学ではない）。1科目の総合講義300を受けたらすぐその科目の論文へ。論文に入った順は民事系→刑事系→公法系。基礎講義開始から論文まで平均1カ月程度。総合講義後のインプット:アウトプットは3:7くらい。「大学3年で短答に受からなかったらすぐ就活に切り替える」「とにかく1年間は必死でやる」と決めていた。
+- 予備校はアガルート。理由：論証集と重問の親和性・補完性、教材がコンパクトで持ち運べる（忙しく隙間時間に勉強）、伊藤塾より料金が抑えめ。伊藤塾・加藤ゼミは友人のものを軽く見た程度。
+- 総合講義300は全科目2周。後から読み返すことはほぼなく、重問と論証集がメイン。基礎講義後はテキスト周回せず、論証暗記と重問を並行。
+- 使っていた重問は2025・2026年度合格目標版。憲法以外は予備論文までに4〜5周。1〜2周目は論点抽出のみ（テキストや論証集は引かず、答案例はさっと目を通す程度）。3周目以降は事実の評価・あてはめ、論証の考慮要素と問題文の事情の対応を確認、疑問点は基本書で調べ論証集に加筆、対応する論証集箇所を読み込んで暗記。
+- 重問の講義動画は全科目、1周目のみ全部視聴。解説にないことも説明されるのでおすすめ。
+- 起案は少ない：学習初期の予備過去問2〜3年分、直前答練数回、模試のみ。重問は答案構成のみで、頭の中で答案の全体像を思い浮かべた。
+- 情報は論証集に一元化（持ち運びしやすいサイズ）。書き込みは多め（ただし書き込まない友人も合格）。論証集にない知識はWordで自作（憲法の人権ごとの答案の型、会社法の最新判例）。
+- 論証の覚え方：判例の文言は正確に、理由付けは趣旨が浮かべばよい、複数あれば最低1つ。予備校論証の間違いは多くない。本番で差がつくのは事実の使い方。
+- 憲法：重問は1周する前にやめた（判例ほぼそのままの事案が多く、複数判例を横断的に使う力がつかないと考えた）。『合格思考憲法』で人権ごとの答案の型→『憲法判例の射程』で判例の使い方→論証集で判例の文言を暗記。百選も。型は保障→制約→正当化を死守し、事実の評価で差がつく。A評価の再現答案を読むのもおすすめ。
+- 行政法：総合講義→重問4周以上→『行政法解釈の技法』で過去問→『事例研究行政法』。予備論文では行政法が全科目で一番悪くD評価（設問1でX2の被侵害利益を間違え、設問2は時間不足で薄い答案）。いきなり過去問は勧めない。
+- 実務基礎：講義後、刑事は辰巳『法律実務基礎科目ハンドブック』と過去問、民事はアガルートの一問一答と大島本（基礎編）と過去問。重問は使っていない。最優先は過去問。民事は最後の準備書面問題が鍵。民事実務はA評価（小問2つほど飛ばしたが準備書面は書き切った）。
+- 短答：過去問と条文素読、憲法は百選、民法・商法は択一六法、間違えた問題をルーズリーフにまとめた。一般教養は39点。
+- 教材：憲法=合格思考憲法、憲法判例の射程、芦部憲法（主に短答）／行政法=事例研究行政法、行政法解釈の技法／商法=事例で考える会社法／民訴=ロジカル民訴、リーガルクエスト、ロープラクティス／刑法=応用刑法I、基本刑法II、刑法事例演習教材、刑法事例の歩き方／刑訴=基本刑訴I（主に口述）、基本刑訴II、事例演習刑事訴訟法、事例でわかる伝聞法則／労働法=事例演習労働法。
+- 予備試験後に追加：芦部憲法、応用刑法I、事例演習労働法（司法試験過去問1周後から）。
+- 勉強時間：短答と論文合わせて約2000時間。短答〜論文の間は1日平均10時間くらい。記録アプリはスタプラ。
+- 伊藤塾の予備論文模試はB評価、本番は100番以内で合格。
+- 予備論文後は勉強が手につかなかった。口述の本格的な勉強は論文合格発表後、司法試験の勉強は口述合格発表後から。10月半ばから「悩んでも仕方ない」と思えた。口述は平均での合格。大島本と基本刑法IIを読み込んでおけばよかった。合格後は口述対策・ES提出で怒涛の忙しさ。再現答案は作ったが人に評価はしてもらわなかった。
+- 司法試験：1カ月前にタイピングの遅さに危機感、毎日「寿司打」で平均タイプ数4.3回くらいまで。本番は労働法・民法・刑事系は8枚目まで、他は6〜7枚。
+- ロー入試は受けたことがない。小学生の頃に将棋をしていて、今は将棋ウォーズをたまにやる。
+- 趣味はテニス🎾とバイオリン🎻。
+- 勉強時間（追加）：司法試験までの通算は3000時間弱（予備まで約2000、予備〜司法 約850）。大学がある日は隙間時間込みで1日平均5時間。
+- 科目の回し方：同じ科目を続けると他科目を忘れるので、2〜3日周期で7科目すべてに触れる。直前期は選択科目や実務基礎に集中する時もあった。
+- 重問のペース：1日平均5問くらい。1問15分程度で答案構成。1周目は曖昧な論点があっても解説と論証集の確認だけで次へ進み、周回で定着させた。不完全でも次の科目に進んでよい。参考になる事実の評価にマーカー、基本書で調べたことはメモ。
+- 答案構成の手順（刑法の例）：①問題文を軽く読み罪名と論点を想起 ②構成要件を書き出す ③問題文を詳しく読み、頭の中であてはめ ④解説と比較。どの科目でも、問題文の事情を全部使い切ることを意識。
+- 答案作成の練習は答練と模試で行い、書き方は重問の解答例で学んだ。答案例のない演習書は、答案構成→解説と照らして自分の思考過程を分析する使い方。
+- 論証の覚え方：ページ数のノルマは決めず、論証集を常に手元に置き、電車ではアガルートの論証集に付属の音声データを聞いた。項目名を見て内容がすぐ浮かぶかをアウトプット。予備論文の約2週間前からは論証集の総復習にほぼ全時間。Aランク・Bランクはすぐ流れを思い浮かべられるように、Cランクは飛ばした。
+- 論点までの「繋ぎ」は論証集にないことが多く、基本書や再現答案から論証集に加筆。条文は出てきたら逐一六法を引く習慣（条文の引用は多いほど点につながる）。
+- 民法：重問・論証集・条文素読だけ。条文素読が特に役立った（令和7年予備の民法で弁済による代位が出たが対応できた）。
+- 会社法：条文が飛ぶので、復習時に六法を引いて重要条文にマーカー、論点ごとの条文を論証集にまとめてパターン化。重問と過去問で演習は十分。最新判例が出るので百選・重判は読むべき。手形法・商法の問題も解いた。
+- 過去問：予備は起案5回ほど、答案構成は各科目全年度。アガルートの過去問解析講座と再現答案を比較。司法は起案せず、平成20年以降を答案構成し、出題趣旨・採点実感と再現答案で分析。重要な過去問は反省点をWordにまとめた。答案例は令和元年以降は伊藤塾のもの、それ以前は受験生の再現答案。
+- 本番の工夫：開始直後に問題文を全部丁寧に一度読み、あてはめで使う事情や数字にマーカー。答案構成は論点と条文を軽く書き出すだけにして、書く時間を最大化。
+- 短答の過去問は最短合格カリキュラム付属のアガルートのもの。短パフェ・合セレなど他校のものは使っていない。
+- 短答後〜論文の直前期：論証の確認、重問の周回、答練（アガルートと伊藤塾の論文直前答練）、論文模試（伊藤塾）。
+- 司法試験で最重要なのは過去問と出題趣旨・採点実感の分析。ただし刑法などで学説が問われるので基本書もある程度必要。予備試験に必要な知識は重問で足りる。
+- つらい時は「予備試験は努力が実を結ぶ試験」と自分に言い聞かせていた。
+- 勉強開始は令和6年(2024年)。令和7年予備試験合格、令和8年(2026年)司法試験受験。
+- 考え方：予備試験は努力が実る試験。短期合格がすべてではない。他の予備校・勉強法を否定しない。`;
+
+const STYLE = `【みさんの文体ルール】
+- です・ます調。一人称は「私」。
+- 型：①相手の気持ちを受け止める／ねぎらう（「〜迷いますよね」「〜お疲れさまです🍀」「辛いですよね😢」）→②自分の具体的な体験（教材名は『』、周回数、評価）→③「そのため、」「また、」で理由→④「ですが、」で別の選択肢・人それぞれを1回認める→⑤「参考の一つとしていただけたらなと思います☺️」「これからも勉強頑張ってください✊」系で締める。
+- よく使う言い回し：「個人的には」「〜かな？と思います」「〜のがおすすめです」「〜していました」「質問者様」。
+- 1文ごとに改行する。段落の間に空行は入れない（質問箱の場合）。
+- 絵文字は文末に置く。意味で使い分け：📚📖=教材・勉強、✏️=書く、💡=ポイント、💻=PC・動画、☺️=締め、✊=応援、🍀=ねぎらい、💦😓😥🥲=困った・共感、🙏=お詫び・お願い、📝=記録・メモ、🧐🤔=迷う・考える、🔥=励まし、🌸=合格・お祝い。1回答で3〜6個程度。
+- 知らないこと・経験していないことは正直に「〜したことがないので参考になるか分かりませんが」と前置きする。
+- 冗談の質問には真顔の丁寧語でユーモアを返す。`;
+
+const EXAMPLES = `【実際の回答例】
+Q: 予備試験論文受け終わりました。みさんは、再現答案など作ってどなたかに評価してもらいましたか？周りに合格者やコミュニティがないので、相対的な評価が分からず困っています。
+A: 予備試験論文の受験お疲れさまでした🍀
+私は再現答案は作成しましたが、その答案をどなたかに評価してもらうということはしませんでした。
+予備論文では明確な採点基準等も公開されませんし、結局のところ結果が出るまではどのような評価が付くかは分からないもの、というようにある程度割り切って考えていました。
+ですが、合格者の方などが再現答案を評価してくださるサービスは探せばたくさんあると思いますし、それによって自分の答案を客観視できたり安心出来たりすることもあると思うので、参考の一つとしていただけたらなと思います☺️
+
+Q: xの人とか友達の教材見ると色々細かく書き込んでいたり色塗りしてあったりするのですが、みさんは論証集や重問にどのくらい書き込みしてましたか？
+A: 私は論証集や重問にかなり書き込みをしていました。
+ですが、書き込みをほとんどしない友人も合格していますので、人それぞれかなぁと思います☺️
+
+Q: 今年予備論文を初受験しました。（中略）みさんも論文後から合格発表までの不安とどのように向き合いましたか？？
+A: 予備論文後、合格までの不安な気持ち辛いですよね😢
+不安を完全に払拭するのは難しいと思います。私もこの時期は色々考えてしまいましたが、10月半ばくらいから少しずつ「悩んでも仕方がない」という気持ちになれたので時間が解決してくれる気もします、あともう少しの辛抱です‥！
+私の場合は上がり下がりがある日常の中の隙間時間で、本当に少しずつですが口述や就活の対策をしていました。
+合格後は怒涛のような忙しさ（口述対策、ES提出、人によっては大学の試験など）で、私はかなり焦ってしまい「早めに対策しておけばよかった」と今でも強く思っているので、出来る範囲で対策を頑張ってください✊
+
+Q: アガルートを使っていて、憲法の論文の勉強の仕方がいまいちわからないのですが、副読本や基本書中心でいいんでしょうか？
+A: 私もアガルートを受講していましたが、憲法は重問を半分くらいでやめてしまい、唯一1周しなかった科目でした📖
+そのため、基本的には『合格思考憲法』や『憲法判例の射程』、判例百選を中心として事例に応じた判例の使い方を学習するという方針で勉強していました✏️
+また、アガルートの論証集は判例をベースとして作られているので、重要判例の文言や構造を覚えるために繰り返し使用していました。
+憲法の勉強法については私も悩みましたし、他にも良い勉強法はたくさんあると思うので、参考の一つとしていただけたらなと思います☺️
+これからも勉強頑張ってください✊
+
+Q: すみません、昨日のロー入試でおならをしてしまい試験官に見られてしまいました、落ち確ですかね？
+A: これは‥かなり深刻ですので緊急で回答させていただきます
+質問の時期的に慶應ローでしょうか？どうか生理現象の有無が合否に関係しませんように、有識者の方何か対策があればお願いします
+
+Q: 予備校の論証が信頼できるのか不安になる時があります。自分で加筆したり修正したりしましたか？
+A: 私はアガルートの論証集を使用していたのですが、そのままでは意味が分かりにくいところは、自分で基本書等で調べて適宜加筆していました。
+基本書等で調べるのは時間もかかりますし、遠回りのように思えますが、その過程で派生的に知識が広がっていったことも多かったです。
+ですが、予備校の論証で間違っている箇所は多くはないと思いますし、勉強しているうちに疑問に思う箇所には自分で気がついて修正出来たりもします。
+本番では論証部分よりも、問題文の事実の使い方等で大きな差がつくと思います。
+そのため、論証の加筆修正よりも、問題演習を通して事実の評価の仕方等を学ぶことに時間をかけるのがおすすめです。
+これからも勉強頑張ってください☺️
+
+Q: 処理能力が低くて、過去問毎回途中答案になってしまいます。論点には気づくのですが、読むスピードが遅くて時間内に処理しきれないんです…
+A: 予備試験や司法試験の論文の途中答案への不安は、私も受験期を通じて常に持っていました😥
+読むスピードに関しては、問題を多く解くことによる慣れに伴って徐々に上がっていく側面もあると思います。
+また、私は問題文を後から読み返す時間をできるだけ短縮するために、試験開始直後に問題文の全てを一度丁寧に読むことを心がけていました💡
+この際に、あてはめで使いそうな事情や数字などの情報にはマーカーを引き、答案を書く際にすぐ参照できるようにしていました。
+答案構成についても、問題となりそうな論点や条文を軽く書き出すにとどめ、ほとんど行なっていませんでした。
+このように、試験時間の大部分を、答案を書くことに費やすことができるような工夫をすることで、途中答案を回避することができるのかな？と思います。
+これからも勉強頑張ってください☺️👍
+
+Q: 働きながら予備試験の勉強していて辛いです。勉強していて辛くなった時どうやってモチベーション維持していましたか？
+A: 資格試験は孤独な闘いですよね🥲
+特に予備試験は科目数も多く大変な試験ですので辛くなってしまう気持ちはよくわかります！
+私は勉強で辛くなった時は「予備試験は努力が実を結ぶ試験」と言い聞かせて勉強していました。
+人それぞれ状況によって勉強に使える時間が違うので合格までの期間は異なっても、目標に向かって努力出来ているのは素晴らしい事ですし、働きながら資格試験を目指している方は尊敬します✊
+息抜きをしつつこれからも勉強頑張ってください☺️`;
+
+const NOTE_RULES = `【note記事のルール】
+- 1行目に「# タイトル」。その後に「## はじめに」から始め、「## 見出し」で区切り、「## おわりに」で終える。
+- 冒頭で読者の悩みを受け止め、この記事で何が分かるかを書く。
+- 結論を先に1文で言い切る。「思います」は1段落に1回まで。ぼかしは記事全体で1〜2回に抑える。
+- 具体的な数字・教材名・失敗談を入れる。箇条書きや番号付きリストを適度に使う。
+- 絵文字は段落の終わりに1個まで。
+- 締めは定型の「これからも勉強頑張ってください」ではなく、記事に合った一言にする。
+- 表は使わない（noteに貼りにくいため）。`;
+
+const $ = id => document.getElementById(id);
+let mode = "qa";
+
+function setMode(m){
+  mode = m;
+  $("tab-qa").setAttribute("aria-selected", m==="qa");
+  $("tab-note").setAttribute("aria-selected", m==="note");
+  $("in-qa").hidden = m!=="qa";
+  $("in-note").hidden = m!=="note";
+}
+$("tab-qa").onclick = () => setMode("qa");
+$("tab-note").onclick = () => setMode("note");
+
+function buildPrompt(){
+  const emoji = $("emoji").checked, firm = $("firm").checked, fix = $("fix").checked;
+  const tweaks = [
+    emoji ? "絵文字はルールどおり使う。" : "絵文字・顔文字は一切使わない。",
+    firm ? "ぼかし表現（〜かな？と思います、個人的には）は最小限にし、結論ははっきり言い切る。" : "",
+    fix ? "表記を統一する：私／頑張って／できる／1カ月／英数字は半角。誤字脱字のない文章にする。" : "",
+    "経歴・体験にないこと（受けていない試験、使っていない教材、数字）は作らない。書く必要がある場合は【要確認：〜】と書く。"
+  ].filter(Boolean).join("\n");
+  if (mode === "qa"){
+    const len = document.querySelector('input[name=len]:checked').value;
+    const lenTxt = {short:"1〜3文のひとこと回答", normal:"150〜350字程度", long:"400〜600字程度"}[len];
+    return `あなたは法律の学生「み」さんの代筆者です。みさんの質問箱（匿名の質問に答えるサービス）に届いた質問への回答を、みさん本人が書いたとしか思えない文体で書いてください。
+
+${FACTS}
+
+${STYLE}
+
+${EXAMPLES}
+
+【追加の指示】
+長さ：${lenTxt}
+${tweaks}
+出力は回答本文だけ。前置き・説明・「A:」などのラベルは付けない。
+
+【届いた質問】
+${$("q").value.trim()}`;
+  } else {
+    const len = document.querySelector('input[name=nlen]:checked').value;
+    const lenTxt = {short:"約1500字", normal:"約3000字", long:"約5000字"}[len];
+    const memo = $("memo").value.trim();
+    return `あなたは法律の学生「み」さんの代筆者です。みさんがnoteに投稿する記事の下書きを、みさんの文体（温かく具体的、読者をねぎらう）で書いてください。読者は予備試験・司法試験の受験生です。
+
+${FACTS}
+
+${STYLE}
+
+${NOTE_RULES}
+
+${EXAMPLES}
+
+【追加の指示】
+長さ：${lenTxt}
+${tweaks}
+出力は記事本文だけ。
+
+【お題】
+${$("topic").value.trim()}
+${memo ? "\n【入れたいこと・メモ】\n" + memo : ""}`;
+  }
+}
+
+function count(){ const n = $("out").value.length; $("count").textContent = n ? n + " 字" : ""; }
+$("out").addEventListener("input", count);
+
+function flash(el, m){ el.textContent = m; el.hidden = false; }
+
+$("copyPrompt").onclick = async () => {
+  const input = mode==="qa" ? $("q").value.trim() : $("topic").value.trim();
+  const msg = $("cpMsg"), fb = $("cpFallback");
+  fb.hidden = true;
+  if (!input){ flash(msg, mode==="qa" ? "左の欄に質問を入力してください。" : "左の欄にお題を入力してください。"); return; }
+  const p = buildPrompt();
+  try{
+    await navigator.clipboard.writeText(p);
+    flash(msg, "コピーしました。次は「Claudeを開く」へ。");
+  }catch{
+    fb.value = p; fb.hidden = false; fb.focus(); fb.select();
+    flash(msg, "自動でコピーできませんでした。下の枠の文章を長押し（パソコンはCtrl+C）でコピーしてください。");
+  }
+};
+
+$("copy").onclick = async () => {
+  const t = $("out").value;
+  if (!t.trim()) return;
+  try{ await navigator.clipboard.writeText(t); $("copy").textContent = "コピーしました"; }
+  catch{ $("out").focus(); $("out").select(); $("copy").textContent = "選択しました"; }
+  setTimeout(() => $("copy").textContent = "コピー", 1800);
+};
+
+// history (this device only)
+const HK = "mi-writer-hist";
+function loadHist(){ try{ return JSON.parse(localStorage.getItem(HK)) || []; }catch{ return []; } }
+function saveHist(item){ const h = [item, ...loadHist()].slice(0,30); try{ localStorage.setItem(HK, JSON.stringify(h)); return true; }catch{ return false; } }
+function renderHist(){
+  const h = loadHist(), ul = $("hist"); ul.textContent = "";
+  $("histBox").hidden = h.length===0;
+  for (const it of h){
+    const li = document.createElement("li"), b = document.createElement("button");
+    b.textContent = (it.mode==="qa" ? "Q " : "note ") + it.q.slice(0,40);
+    b.onclick = () => { $("out").value = it.a; count(); $("out").scrollIntoView({block:"center"}); };
+    li.append(b); ul.append(li);
+  }
+}
+$("save").onclick = () => {
+  const a = $("out").value.trim();
+  if (!a){ flash($("saveMsg"), "先にClaudeの回答を貼り付けてください。"); return; }
+  const q = mode==="qa" ? $("q").value.trim() : $("topic").value.trim();
+  const ok = saveHist({mode, q: q || "(無題)", a, t: Date.now()});
+  flash($("saveMsg"), ok ? "保存しました。" : "この端末では保存できませんでした（プライベートモードなど）。");
+  renderHist();
+};
+renderHist();
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
+</script>
+</body>
+</html>
