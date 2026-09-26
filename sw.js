@@ -1,5 +1,5 @@
 // Offline cache for み文体ライター. Bump VERSION whenever index.html changes.
-const VERSION = "mi-writer-v5";
+const VERSION = "mi-writer-v6";
 const FILES = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png", "data/querie.json", "data/marshmallow.json", "data/facts.md"];
 
 self.addEventListener("install", (e) => {
@@ -18,7 +18,7 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET" || new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request, { cache: "no-cache" })   // always revalidate, so a new version shows up on the next open
       .then((res) => {
         const copy = res.clone();
         caches.open(VERSION).then((c) => c.put(e.request, copy));

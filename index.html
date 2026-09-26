@@ -214,6 +214,19 @@ a.btn{display:inline-block;text-decoration:none;width:fit-content}
       </ol>
       <p><a class="btn" id="editFacts" href="#" target="_blank" rel="noopener">経歴メモを編集する ↗</a></p>
     </details>
+    <details>
+      <summary>投稿したnote記事をお手本に加えるには</summary>
+      <p class="hint" id="notesStatus">お手本のnote記事：読み込み中…</p>
+      <ol class="rules">
+        <li>noteで投稿した記事の本文をすべてコピーする（タイトルも含めて）</li>
+        <li>下のボタンでGitHubの新規作成画面を開く（GitHubにログインした状態で）</li>
+        <li>大きな入力欄に貼り付ける（ファイル名は今日の日付で自動で入ります。同じ日に2本目を追加するときは、名前の最後を「-2.md」のように変えてください）</li>
+        <li>右上の緑の「Commit changes...」→ もう一度「Commit changes」を押す</li>
+        <li>1〜2分後にアプリを開き直すと、「note記事」タブの下書きにお手本として使われます</li>
+      </ol>
+      <p><a class="btn" id="addNote" href="#" target="_blank" rel="noopener">note記事を追加する ↗</a></p>
+      <p class="hint">お手本にした記事は、お題に近いものから2本まで指示文に入ります。消したいときはGitHubの <code>data/notes</code> フォルダで記事を開き、ゴミ箱マークから削除してください。</p>
+    </details>
   </section>
 </div>
 
@@ -344,6 +357,8 @@ ${STYLE}
 
 ${NOTE_RULES}
 
+${notesBlock(q)}
+
 ${EXAMPLES}
 
 ${relatedBlock(q)}
@@ -438,6 +453,33 @@ async function loadData(){
     ? `経歴メモ ${lines.length}項目・過去の回答 ${ANSWERS.length}件（質問箱の最新：${newest}）`
     : "データを読み込めませんでした。電波のある場所で開き直してください。";
   renderSimilar();
+  loadNotes();
+}
+
+// ---- note articles she actually posted (data/notes/*.md), used as style models in the note tab ----
+let NOTES = [];
+function repoInfo(){ const b = rawBase(); if (!b) return null; const [, user, repo] = b.match(/githubusercontent\.com\/([^/]+)\/([^/]+)\//); return {user, repo}; }
+async function loadNotes(){
+  const r = repoInfo();
+  if (!r){ $("notesStatus").textContent = "お手本のnote記事：GitHub Pagesで開いたときだけ使えます"; return; }
+  try{
+    const res = await fetch(`https://api.github.com/repos/${r.user}/${r.repo}/contents/data/notes`, {cache:"no-store"});
+    const files = res.ok ? (await res.json()).filter(f => f.type === "file" && /\.(md|txt)$/i.test(f.name) && f.name.toLowerCase() !== "readme.md") : [];
+    NOTES = (await Promise.all(files.map(async f => {
+      try{ const t = await (await fetch(f.download_url, {cache:"no-store"})).text(); return t.trim() ? {name: f.name, text: t.trim()} : null; }catch{ return null; }
+    }))).filter(Boolean);
+    $("notesStatus").textContent = `お手本のnote記事：${NOTES.length}本`;
+  }catch{
+    $("notesStatus").textContent = "お手本のnote記事：読み込めませんでした（電波のある場所で開き直してください）";
+  }
+}
+function notesBlock(query){
+  if (!NOTES.length) return "";
+  const qg = grams(query);
+  const picked = NOTES.map(n => { const g = grams(n.text); let hit = 0; qg.forEach(k => { if (g.has(k)) hit++; }); return {n, s: hit}; })
+    .sort((a,b) => b.s - a.s || (a.n.name < b.n.name ? 1 : -1)).slice(0,2).map(o => o.n);
+  return "【みさんが実際に投稿したnote記事（文体・構成のお手本。上のnote記事のルールと食い違うときは、こちらを優先して真似る。内容の事実も使ってよい）】\n"
+    + picked.map((n, i) => `――― お手本${i+1} ―――\n${n.text.slice(0,4000)}`).join("\n\n");
 }
 
 // Character-bigram overlap weighted by rarity (IDF), so shared topic words count more than 「勉強」「論文」.
@@ -479,7 +521,11 @@ function renderSimilar(){
     d.append(s, a, b); li.append(d); list.append(li);
   }
 }
-{ const b = rawBase(); if (b) $("editFacts").href = b.replace("https://raw.githubusercontent.com/", "https://github.com/").replace(/\/main\/$/, "/edit/main/data/facts.md"); else $("editFacts").hidden = true; }
+{ const r = repoInfo();
+  if (r){
+    $("editFacts").href = `https://github.com/${r.user}/${r.repo}/edit/main/data/facts.md`;
+    $("addNote").href = `https://github.com/${r.user}/${r.repo}/new/main/data/notes?filename=${new Date().toISOString().slice(0,10)}.md`;
+  } else { $("editFacts").hidden = true; $("addNote").hidden = true; } }
 let simTimer;
 $("q").addEventListener("input", () => { clearTimeout(simTimer); simTimer = setTimeout(renderSimilar, 300); });
 loadData();
