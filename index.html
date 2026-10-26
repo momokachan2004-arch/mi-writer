@@ -89,6 +89,9 @@ a.btn{display:inline-block;text-decoration:none;width:fit-content}
 .steps>li{counter-increment:s;position:relative;padding-left:40px;display:flex;flex-direction:column;gap:8px}
 .steps>li::before{content:counter(s);position:absolute;left:0;top:0;width:28px;height:28px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-family:var(--display);font-weight:700;display:grid;place-items:center}
 .step-t{font-weight:700}
+.quick-claude{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--accent-soft);display:flex;flex-direction:column;gap:8px;margin-bottom:18px}
+.quick-claude .btn{width:fit-content}
+.quick-claude .hint{margin:0}
 .steps .btn{width:fit-content}
 #out{min-height:160px;white-space:pre-wrap}
 .similar{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--accent-soft);display:flex;flex-direction:column;gap:8px}
@@ -173,6 +176,12 @@ a.btn{display:inline-block;text-decoration:none;width:fit-content}
         <span class="status done">無料プランOK</span>
       </div>
 
+      <div class="quick-claude">
+        <button class="btn primary" id="openClaudeWithPrompt">コピーしてClaudeを開く</button>
+        <p class="hint">1回押すだけで、指示文のコピーとClaudeを開くところまでやります。Claudeでは貼り付けて送信してください。戻ってきて回答を貼ると、自動で保存します。</p>
+        <p class="hint" id="claudeMsg" hidden></p>
+      </div>
+
       <ol class="steps">
         <li>
           <div class="step-t">指示文をコピー</div>
@@ -188,7 +197,7 @@ a.btn{display:inline-block;text-decoration:none;width:fit-content}
         </li>
         <li>
           <div class="step-t">返ってきた文章を貼って保存（任意）</div>
-          <p class="hint">保存しておくと、下の「保存した下書き」からいつでも見返せます（この端末だけに保存）。</p>
+          <p class="hint">保存しておくと、下の「保存した下書き」からいつでも見返せます（この端末だけに保存）。上の「コピーしてClaudeを開く」で行ったときは、貼り付けると自動で保存します。</p>
           <textarea id="out" rows="7" placeholder="Claudeの回答をここに貼り付け"></textarea>
           <div class="meta"><span id="count"></span><span></span></div>
           <div class="row">
@@ -409,6 +418,48 @@ $("copyPrompt").onclick = async () => {
     flash(msg, "自動でコピーできませんでした。下の枠の文章を長押し（パソコンはCtrl+C）でコピーしてください。");
   }
 };
+
+// ---- quick flow: copy the prompt and open Claude in one click ----
+// The prompt is ~10,000 characters, so it cannot ride in a claude.ai/new?q= URL
+// (URL-encoding expands it to roughly 90,000 characters). The clipboard is the transport.
+$("openClaudeWithPrompt").onclick = async () => {
+  const input = mode==="qa" ? $("q").value.trim() : $("topic").value.trim();
+  const msg = $("claudeMsg"), fb = $("cpFallback");
+  if (!input){ flash(msg, mode==="qa" ? "左の欄に質問を入力してください。" : "左の欄にお題を入力してください。"); return; }
+  const p = buildPrompt();
+  try{
+    await navigator.clipboard.writeText(p);
+  }catch{
+    fb.value = p; fb.hidden = false; fb.focus(); fb.select();
+    flash(msg, "自動でコピーできませんでした。「指示文をコピー」の下の枠の文章をコピーしてから「Claudeを開く」を押してください。");
+    return;
+  }
+  try{ localStorage.setItem("miw_state", JSON.stringify({step:"waiting-answer", savedAt: Date.now()})); }catch{}
+  const w = window.open("https://claude.ai/new", "_blank");
+  flash(msg, w ? "コピーしてClaudeを開きました。Claudeに貼り付けて送信してください。" : "コピーしました。ポップアップが止められたので「Claudeを開く」を押してください。");
+};
+
+// Coming back from Claude: point at the paste box. Paste then auto-saves via the existing #save handler.
+window.addEventListener("pageshow", () => {
+  let s = null;
+  try{ s = JSON.parse(localStorage.getItem("miw_state") || "null"); }catch{}
+  if (s && s.step === "waiting-answer"){
+    if (Date.now() - (s.savedAt || 0) > 6 * 60 * 60 * 1000){ try{ localStorage.removeItem("miw_state"); }catch{} return; }
+    flash($("claudeMsg"), "おかえりなさい。Claudeの回答を下の欄に貼ると自動で保存します。");
+    $("out").scrollIntoView({block:"center"});
+  }
+});
+$("out").addEventListener("paste", () => {
+  setTimeout(() => {
+    if (!$("out").value.trim()) return;
+    let s = null;
+    try{ s = JSON.parse(localStorage.getItem("miw_state") || "null"); }catch{}
+    if (s && s.step === "waiting-answer"){
+      try{ localStorage.removeItem("miw_state"); }catch{}
+      $("save").click();
+    }
+  }, 0);
+});
 
 $("copy").onclick = async () => {
   const t = $("out").value;
